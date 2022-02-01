@@ -23,6 +23,11 @@ class ProxyRotationMiddleware:
             {"proxy": "xxx.xxx.xxx:xxxx","auth": "xxx:xxx"},
             {"proxy": "xxx.xxx.xxx:xxxx","auth": "xxx:xxx"}
         ]
+    spider:
+        Change the proxy selection mode:
+            proxy_mode=1 or 2
+        Do not use a proxy for the spider:
+            proxy_enabled=False
     """
 
     logging_enabled = True
