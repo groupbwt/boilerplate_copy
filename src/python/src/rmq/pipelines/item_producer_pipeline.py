@@ -4,6 +4,7 @@ import logging
 
 import pika
 from scrapy import signals
+from scrapy.crawler import Crawler
 from scrapy.exceptions import CloseSpider, DontCloseSpider
 from twisted.internet import reactor
 
@@ -30,10 +31,10 @@ class ItemProducerPipeline:
         crawler.signals.connect(o.spider_idle, signal=signals.spider_idle)
         return o
 
-    def __init__(self, crawler):
+    def __init__(self, crawler: Crawler):
         super().__init__()
         self.crawler = crawler
-        self.__spider = None
+        self.spider = crawler.spider
 
         self.delivery_tag_meta_key = RMQConstants.DELIVERY_TAG_META_KEY.value
         self.msg_body_meta_key = RMQConstants.MSG_BODY_META_KEY.value
@@ -44,35 +45,27 @@ class ItemProducerPipeline:
         self.pending_items_buffer = []
 
     def spider_opened(self, spider):
-        """execute on spider_opened signal and initialize connection, callbacks, start consuming"""
-        """Set current spider instance"""
-        self.__spider = spider
-
         """Check spider for correct declared callbacks/errbacks/methods/variables"""
-        if not self._is_spider_has_required_methods():
+        if self._validate_spider_has_attributes() is False:
             raise CloseSpider(
-                "Attached spider has no configured get_result_queue_name"
+                "Attached spider has no configured task_queue_name and processing_tasks observer"
             )
 
         """Configure loggers"""
-        logger.setLevel(self.__spider.settings.get("LOG_LEVEL", "INFO"))
-        logging.getLogger("pika").setLevel(self.__spider.settings.get("PIKA_LOG_LEVEL", "WARNING"))
+        logger.setLevel(self.spider.settings.get("LOG_LEVEL", "INFO"))
+        logging.getLogger("pika").setLevel(self.spider.settings.get("PIKA_LOG_LEVEL", "WARNING"))
 
         """Declare/retrieve queue name from spider instance"""
-        result_queue_name = self._get_result_queue_name()
-        if not isinstance(result_queue_name, str) or len(result_queue_name) == 0:
-            raise CloseSpider(
-                f"Invalid result queue name: {result_queue_name}"
-            )
+        result_queue_name = spider.result_queue_name
 
         """Build pika connection parameters and start connection in separate twisted thread"""
         parameters = pika.ConnectionParameters(
-            host=self.__spider.settings.get("RABBITMQ_HOST"),
-            port=int(self.__spider.settings.get("RABBITMQ_PORT")),
-            virtual_host=self.__spider.settings.get("RABBITMQ_VIRTUAL_HOST"),
+            host=self.spider.settings.get("RABBITMQ_HOST"),
+            port=int(self.spider.settings.get("RABBITMQ_PORT")),
+            virtual_host=self.spider.settings.get("RABBITMQ_VIRTUAL_HOST"),
             credentials=pika.credentials.PlainCredentials(
-                username=self.__spider.settings.get("RABBITMQ_USERNAME"),
-                password=self.__spider.settings.get("RABBITMQ_PASSWORD"),
+                username=self.spider.settings.get("RABBITMQ_USERNAME"),
+                password=self.spider.settings.get("RABBITMQ_PASSWORD"),
             ),
             heartbeat=RMQDefaultOptions.CONNECTION_HEARTBEAT.value,
         )
@@ -91,11 +84,16 @@ class ItemProducerPipeline:
                     self.rmq_connection.stop
                 )
 
-    def _is_spider_has_required_methods(self):
-        spider_methods = [
-            attr for attr in dir(self.__spider) if callable(getattr(self.__spider, attr))
+    def _validate_spider_has_attributes(self):
+        spider_attributes = [
+            attr for attr in dir(self.spider) if not callable(getattr(self.spider, attr))
         ]
-        if "get_result_queue_name" not in spider_methods:
+        if "result_queue_name" not in spider_attributes:
+            return False
+        if (
+            not isinstance(self.spider.result_queue_name, str)
+            or len(self.spider.result_queue_name) == 0
+        ):
             return False
         return True
 
@@ -110,7 +108,7 @@ class ItemProducerPipeline:
         if self.crawler.engine.slot is None or self.crawler.engine.slot.closing:
             logger.critical("SPIDER ALREADY CLOSED")
             return
-        self.crawler.engine.close_spider(self.__spider)
+        self.crawler.engine.close_spider(self.spider)
 
     def connect(self, parameters, queue_name):
         """Creates and runs pika select connection"""
@@ -120,7 +118,7 @@ class ItemProducerPipeline:
             owner=self,
             options={
                 "enable_delivery_confirmations": False,
-                "prefetch_count": self.__spider.settings.get("CONCURRENT_REQUESTS", 1),
+                "prefetch_count": self.spider.settings.get("CONCURRENT_REQUESTS", 1),
             },
             is_consumer=False,
         )
@@ -133,19 +131,9 @@ class ItemProducerPipeline:
             if self.delivery_tag_meta_key in item_as_dictionary:
                 del item_as_dictionary[self.delivery_tag_meta_key]
             cb = functools.partial(
-                self.rmq_connection.publish_message,
-                queue_name=self.choose_queue_name(item, self.__spider),
-                message=json.dumps(item_as_dictionary)
+                self.rmq_connection.publish_message, message=json.dumps(item_as_dictionary)
             )
             self.rmq_connection.connection.ioloop.add_callback_threadsafe(cb)
-
-    def choose_queue_name(self, item, spider):
-        if isinstance(item, RMQItem):
-            return spider.get_result_queue_name()
-        else:
-            raise NotImplementedError(
-                f"Method choose_queue_name must be overriding, because got unexpected item type: {type(item)}"
-            )
 
     def process_item(self, item, spider):
         """Invoked when item is processed"""
@@ -157,6 +145,3 @@ class ItemProducerPipeline:
             else:
                 self.pending_items_buffer.append(item)
         return item
-
-    def _get_result_queue_name(self) -> str:
-        return self.__spider.get_result_queue_name()

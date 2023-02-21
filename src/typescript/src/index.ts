@@ -2,11 +2,11 @@ import yargs from 'yargs';
 import Crawler from "./core/crawler";
 import Argv from "./interfaces/argv";
 import { loadDotEnv } from "./utils/laod-dot-env";
-import { LoggingLevel, Logger } from "./utils/logger";
+import { Logger } from "./utils/logger";
 
 yargs.command('crawl <spiderName>', 'run the spider', (yargs) => {
     yargs.positional('name', {
-        describe: 'spider name',
+        describe: 'spider name'
     });
 }, main)
     .options({
@@ -14,7 +14,7 @@ yargs.command('crawl <spiderName>', 'run the spider', (yargs) => {
             type: 'string',
             default: 'parser',
             choices: ['parser', 'worker']
-        },
+        }
         // 'task': {
         //     type: 'string',
         //     demandOption: true,

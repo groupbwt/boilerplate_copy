@@ -5,8 +5,8 @@ from datetime import datetime, timedelta
 from distutils.util import strtobool
 from typing import Dict
 
-from scrapy.utils.log import configure_logging
 from dotenv import load_dotenv
+from scrapy.utils.log import configure_logging
 
 load_dotenv()
 
@@ -20,18 +20,13 @@ PROXY = os.getenv("PROXY", "")
 PROXY_AUTH = os.getenv("PROXY_AUTH", "")
 PROXY_ENABLED = strtobool(os.getenv("PROXY_ENABLED", "False"))
 
-USER_AGENT_RELEASE_DATE = '2020-11-17'
-USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36"
-)
+USER_AGENT_RELEASE_DATE = '2021-11-01'
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.54 Safari/537.36"
 
 CONCURRENT_REQUESTS = int(os.getenv("CONCURRENT_REQUESTS", "16"))
 CONCURRENT_REQUESTS_PER_DOMAIN = int(os.getenv("CONCURRENT_REQUESTS_PER_DOMAIN", "8"))
 DOWNLOAD_DELAY = int(os.getenv("DOWNLOAD_DELAY", "0"))
 DOWNLOAD_TIMEOUT = int(os.getenv("DOWNLOAD_TIMEOUT", "180"))
-
-ROBOTSTXT_OBEY = False
-COOKIES_ENABLED = True
 
 TELNETCONSOLE_ENABLED = False
 TELNETCONSOLE_PASSWORD = "password"

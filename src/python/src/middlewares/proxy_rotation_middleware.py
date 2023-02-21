@@ -6,7 +6,7 @@ import json
 from w3lib.http import basic_auth_header
 from pathlib import Path
 
-log = logging.getLogger('proxy_rotation')
+logger = logging.getLogger('proxy_rotation')
 
 class ProxyMode:
     RANDOMIZE_EVERY_REQUESTS = 1
@@ -39,8 +39,7 @@ class ProxyRotationMiddleware:
         self.proxy_enabled: bool = bool(settings['PROXY_ENABLED']) if settings['PROXY_ENABLED'] else None
         self.proxy_list: list = self.get_proxy_list(settings)
 
-    @staticmethod
-    def get_proxy_list(settings):
+    def get_proxy_list(self, settings):
         proxy_list = None
         file = settings['PROXY_LIST_FILE']
         if file:
@@ -48,10 +47,10 @@ class ProxyRotationMiddleware:
             if file_path.exists():
                 with open(file_path, 'r') as file:
                     proxy_list_json = file.read()
-                proxy_list = ProxyRotationMiddleware.__loads_proxy_list_json(proxy_list_json, file_path)
-                ProxyRotationMiddleware.__is_proxy_list_correct(proxy_list)
+                proxy_list = self.__loads_proxy_list_json(proxy_list_json, file_path)
+                self.__is_proxy_list_correct(proxy_list)
             else:
-                log.warning(f"File {file_path} does not exist")
+                logger.warning(f"File {file_path} does not exist")
 
         return proxy_list
 
@@ -62,7 +61,7 @@ class ProxyRotationMiddleware:
                 proxy_list = json.loads(proxy_list_json)
                 return proxy_list
             except:
-                raise Exception(f"Incorect json format in {file} file")
+                raise Exception(f"Incorrect json format in {file} file")
         return None
 
     @staticmethod
@@ -92,8 +91,6 @@ class ProxyRotationMiddleware:
 
     def update_request(self, request: Request, spider: Spider) -> Request:
         if self.proxy_list:
-            proxy_item = None
-
             if self.mode == ProxyMode.RANDOMIZE_EVERY_REQUESTS:
                 proxy_item = random.choice(list(self.proxy_list))
             elif self.mode == ProxyMode.IN_ORDER_EVERY_REQUESTS:

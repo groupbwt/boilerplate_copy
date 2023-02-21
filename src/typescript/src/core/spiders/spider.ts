@@ -11,9 +11,9 @@ import ProcessArguments from "../../interfaces/argv";
 export default abstract class Spider {
     public static spiderName: string = 'base';
 
+    abstract taskQueueName: string;
     public settings: Settings;
     public logger = Logger.createLogger(this.constructor.name);
-    public taskQueueName: string | null = null;
     protected blockedRequestList: Array<(request: HTTPRequest) => boolean> = [];
     protected allowedRequestList: Array<(request: HTTPRequest) => boolean> = [];
     protected browser: Browser | null = null;
@@ -27,8 +27,8 @@ export default abstract class Spider {
 
     abstract convertArgsToInputMessage(args: ProcessArguments | object): InputItem;
 
-    //@ts-ignore
-    abstract async* process(inputMessage: InputItem): AsyncIterableIterator<OutputItem>;
+
+    abstract process(inputMessage: InputItem): AsyncIterableIterator<OutputItem>;
 
     public async* run(args: ProcessArguments): AsyncIterableIterator<OutputItem> {
         for await (const item of this.process(this.convertArgsToInputMessage(args))) {
